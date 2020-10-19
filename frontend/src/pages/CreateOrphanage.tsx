@@ -1,0 +1,178 @@
+import React, {useState, FormEvent, ChangeEvent} from "react";
+import { Map, Marker, TileLayer } from 'react-leaflet';
+import L, { LeafletMouseEvent } from 'leaflet';
+import { useHistory } from "react-router-dom";
+
+import { FiArrowLeft, FiPlus } from "react-icons/fi";
+
+import api from '../services/api'
+
+import mapMarkerImg from '../images/maker.svg';
+
+import mapIcon from '../utils/MapIcon'
+
+import Sidebar from '../components/Sidebar'
+
+import '../styles/pages/create-orphanage.css';
+
+
+export default function CreateOrphanage() {
+
+  const [position, setPosition] = useState({latitude: 0, longitude: 0})
+  const [name, setName] = useState('')  
+  const [about, setAbout] = useState('')
+  const [instructions, setInstructions] = useState('')
+  const [opening_hours, setOpeningHours] = useState('')
+  const [open_on_weekends, setOpenOnWeekends] = useState(true)
+  const [images, setImages] = useState<File[]>([])
+  const [selectedImagesPreview, setSelectedImagesPreview] = useState<string[]>([])
+
+  const { push } = useHistory();
+
+  function handleMapClick(e: LeafletMouseEvent) {
+     const {lat, lng} = e.latlng
+
+     setPosition({latitude: lat, longitude: lng})
+  }
+
+  function handleSelectImages(e: ChangeEvent<HTMLInputElement>){
+     if(!e.target.files) {return}
+
+     const files = Array.from(e.target.files)
+
+     setImages(files)
+
+     const imagePreview = files.map(file => {
+         return URL.createObjectURL(file)
+     })
+
+     setSelectedImagesPreview(imagePreview)
+  }
+
+  function handleSubmit(e: FormEvent){
+      e.preventDefault()
+
+      const { latitude, longitude } = position
+
+      const data = new FormData()
+
+      data.append('name', name)
+      data.append('about', about)
+      data.append('instructions', instructions )
+      data.append('opening_hours', opening_hours)
+      data.append('open_on_weekends', String(open_on_weekends))
+      data.append('latitude', String(latitude) )
+      data.append('longitude', String(longitude) )
+      images.forEach(image => data.append('image', image))  
+      
+      api.post('/orphanages', data)
+         .then(() => {
+             alert('Cadastro realizado com sucesso')
+
+             push('/app')
+         })
+         .catch((err) => {
+
+            if(!err){
+                console.log(err)
+
+                return alert('Error de cadastro')
+            }
+
+            console.error(err)
+
+            alert('Deu ruim champs')
+         })
+
+  }
+
+  return (
+    <div id="page-create-orphanage">
+
+      <Sidebar />
+    
+      <main>
+        <form className="create-orphanage-form" onSubmit={handleSubmit} >
+          <fieldset>
+            <legend>Dados</legend>
+
+            <Map 
+              center={[-23.5682479,-46.5446162]} 
+              style={{ width: '100%', height: 280 }}
+              zoom={15}
+              onclick={handleMapClick}
+            >
+              <TileLayer 
+                url={`https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/256/{z}/{x}/{y}@2x?access_token=${process.env.REACT_APP_MAPBOX_TOKEN}`}
+              />
+              {position.latitude !== 0 && (
+                <Marker interactive={false} icon={mapIcon} position={[position.latitude, position.longitude]} />
+              )}
+            </Map>
+
+            <div className="input-block">
+              <label htmlFor="name">Nome</label>
+              <input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+
+            <div className="input-block">
+              <label htmlFor="about">Sobre <span>Máximo de 300 caracteres</span></label>
+              <textarea id="name" maxLength={300} value={about} onChange={(e) => setAbout(e.target.value)} />
+            </div>
+
+            <div className="input-block">
+              <label htmlFor="images">Fotos</label>
+
+              <div className="uploaded-image">
+                 {selectedImagesPreview.map(image => (
+                     <img key={image} src={image} alt="Local do orfanato" />
+                 ))}
+
+                 <label htmlFor="image[]" className="new-image">
+                    <FiPlus size={24} color="#15b6d6" />
+                 </label>
+              </div>
+
+              <input type="file" id="image[]" multiple onChange={handleSelectImages} />
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Visitação</legend>
+
+            <div className="input-block">
+              <label htmlFor="instructions">Instruções</label>
+              <textarea id="instructions" value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+            </div>
+
+            <div className="input-block">
+              <label htmlFor="opening_hours">Horário de funcionamento</label>
+              <input id="opening_hours" value={opening_hours} onChange={(e) => setOpeningHours(e.target.value)} />
+            </div>
+
+            <div className="input-block">
+              <label htmlFor="open_on_weekends">Atende fim de semana</label>
+
+              <div className="button-select">
+                <button type="button" 
+                className={open_on_weekends ? 'active' : '' } onClick={() => setOpenOnWeekends(true)} >
+                    Sim
+                </button>
+                <button 
+                type="button"
+                className={open_on_weekends ? 'active' : '' } onClick={() => setOpenOnWeekends(false)} 
+                >
+                    Não
+                </button>
+              </div>
+            </div>
+          </fieldset>
+
+          <button className="confirm-button" type="submit">
+            Confirmar
+          </button>
+        </form>
+      </main>
+    </div>
+  );
+}
